@@ -49,6 +49,7 @@ struct options {
   bool checkConfig;  //!< check CSV config files, then stop
   bool dumpConfig;   //!< dump CSV config files, then stop
   unsigned int pollInterval;  //!< poll interval in seconds, 0 to disable [5]
+  unsigned int pollRetries;  //!< number of retries for failed polls [0]
   bool injectMessages;  //!< inject remaining arguments as already seen messages
 
   symbol_t address;  //!< own bus address [31]

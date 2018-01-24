@@ -144,7 +144,7 @@ MainLoop::MainLoop(const struct options& opt, Device *device, MessageMap* messag
       opt.acquireRetries, opt.sendRetries,
       latency, opt.acquireTimeout, opt.receiveTimeout,
       opt.masterCount, opt.generateSyn,
-      opt.pollInterval);
+      opt.pollInterval, opt.pollRetries);
   m_busHandler->start("bushandler");
 
   // create network

@@ -544,7 +544,7 @@ result_t BusHandler::handleSymbol() {
   }
 
   // send symbol if necessary
-  result_t result;
+  result_t result = RESULT_EMPTY;
   struct timespec sentTime, recvTime;
   if (sending) {
     if (m_state != bs_sendSyn && (sendSymbol == ESC || sendSymbol == SYN)) {
@@ -555,15 +555,27 @@ result_t BusHandler::handleSymbol() {
         sendSymbol = ESC;
       }
     }
-    result = m_device->send(sendSymbol);
-    clockGettime(&sentTime);
-    if (result == RESULT_OK) {
-      if (m_state == bs_ready) {
-        timeout = m_transferLatency+m_busAcquireTimeout;
+
+    for (int pollRetries = m_failedPollRetries + 1; pollRetries >= 0; pollRetries--) {
+      result = m_device->send(sendSymbol);
+      clockGettime(&sentTime);
+      if (result == RESULT_OK) {
+        if (m_state == bs_ready) {
+          timeout = m_transferLatency+m_busAcquireTimeout;
+        } else {
+          timeout = m_transferLatency+SEND_TIMEOUT;
+        }
+        break;
       } else {
-        timeout = m_transferLatency+SEND_TIMEOUT;
+        if (startRequest->is_poll()) {
+          logError(lf_bus, "poll failed: %s%s", getResultCode(result), pollRetries > 0 ? ", retry" : "");
+        } else {
+          break;
+        }
       }
-    } else {
+    }
+
+    if (result != RESULT_OK) {
       sending = false;
       timeout = SYN_TIMEOUT;
       if (startRequest != NULL && m_nextRequests.remove(startRequest)) {
@@ -572,6 +584,7 @@ result_t BusHandler::handleSymbol() {
       setState(bs_skip, result);
     }
   }
+
 
   // receive next symbol (optionally check reception of sent symbol)
   symbol_t recvSymbol;

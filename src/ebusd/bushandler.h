@@ -126,6 +126,8 @@ class BusRequest {
    */
   virtual bool notify(result_t result, const SlaveSymbolString& slave) = 0;
 
+  /** is this request a poll request? */
+  bool is_poll() { return false; }
 
  protected:
   /** the master data @a MasterSymbolString to send. */
@@ -165,9 +167,11 @@ class PollRequest : public BusRequest {
    */
   result_t prepare(symbol_t masterAddress);
 
+  /** is this request a poll request? */
+  bool is_poll() { return true; }
+
   // @copydoc
   bool notify(result_t result, const SlaveSymbolString& slave) override;
-
 
  private:
   /** the master data @a MasterSymbolString. */
@@ -178,6 +182,7 @@ class PollRequest : public BusRequest {
 
   /** the current part index in @a m_message. */
   size_t m_index;
+
 };
 
 
@@ -363,13 +368,14 @@ class BusHandler : public WaitThread {
    * @param lockCount the number of AUTO-SYN symbols before sending is allowed after lost arbitration, or 0 for auto detection.
    * @param generateSyn whether to enable AUTO-SYN symbol generation.
    * @param pollInterval the interval in seconds in which poll messages are cycled, or 0 if disabled.
+   * @param failedPollRetries the number of times a failed poll is repeated (other than lost arbitration).
    */
   BusHandler(Device* device, MessageMap* messages,
       symbol_t ownAddress, bool answer,
       unsigned int busLostRetries, unsigned int failedSendRetries,
       unsigned int transferLatency, unsigned int busAcquireTimeout, unsigned int slaveRecvTimeout,
       unsigned int lockCount, bool generateSyn,
-      unsigned int pollInterval)
+      unsigned int pollInterval, unsigned int failedPollRetries)
     : WaitThread(), m_device(device), m_reconnect(false), m_messages(messages),
       m_ownMasterAddress(ownAddress), m_ownSlaveAddress(getSlaveAddress(ownAddress)),
       m_answer(answer), m_addressConflict(false),
@@ -378,7 +384,8 @@ class BusHandler : public WaitThread {
       m_masterCount(device->isReadOnly()?0:1), m_autoLockCount(lockCount == 0),
       m_lockCount(lockCount <= 3 ? 3 : lockCount), m_remainLockCount(m_autoLockCount ? 1 : 0),
       m_generateSynInterval(generateSyn ? SYN_TIMEOUT*getMasterNumber(ownAddress)+SYMBOL_DURATION : 0),
-      m_pollInterval(pollInterval), m_symbolLatencyMin(-1), m_symbolLatencyMax(-1), m_arbitrationDelayMin(-1),
+      m_pollInterval(pollInterval), m_failedPollRetries(failedPollRetries),
+      m_symbolLatencyMin(-1), m_symbolLatencyMax(-1), m_arbitrationDelayMin(-1),
       m_arbitrationDelayMax(-1), m_lastReceive(0), m_lastPoll(0),
       m_currentRequest(NULL), m_currentAnswering(false), m_runningScans(0), m_nextSendPos(0),
       m_symPerSec(0), m_maxSymPerSec(0),
@@ -691,6 +698,9 @@ class BusHandler : public WaitThread {
 
   /** the interval in seconds in which poll messages are cycled, or 0 if disabled. */
   const unsigned int m_pollInterval;
+
+  /** the number of times a failed poll is repeated (other than lost arbitration). */
+  const unsigned int m_failedPollRetries;
 
   /** the minimal measured latency between send and receive of a symbol in milliseconds, -1 if not yet known. */
   int m_symbolLatencyMin;

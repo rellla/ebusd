@@ -91,6 +91,7 @@ static struct options opt = {
   false,  // checkConfig
   false,  // dumpConfig
   5,  // pollInterval
+  0,  // pollRetries
   false,  // injectMessages
 
   0x31,  // address
@@ -143,7 +144,8 @@ static const char argpdoc[] =
 #define O_CHKCFG (O_CFGLNG+1)
 #define O_DMPCFG (O_CHKCFG+1)
 #define O_POLINT (O_DMPCFG+1)
-#define O_ANSWER (O_POLINT+1)
+#define O_POLRET (O_POLINT+1)
+#define O_ANSWER (O_POLRET+1)
 #define O_ACQTIM (O_ANSWER+1)
 #define O_ACQRET (O_ACQTIM+1)
 #define O_SNDRET (O_ACQRET+1)
@@ -187,6 +189,7 @@ static const struct argp_option argpoptions[] = {
   {"checkconfig",    O_CHKCFG, NULL,    0, "Check CSV config files, then stop", 0 },
   {"dumpconfig",     O_DMPCFG, NULL,    0, "Check and dump CSV config files, then stop", 0 },
   {"pollinterval",   O_POLINT, "SEC",   0, "Poll for data every SEC seconds (0=disable) [5]", 0 },
+  {"pollretries",    O_POLRET, "COUNT", 0, "Repeat failed polls COUNT times [0]", 0 },
   {"inject",         'i',      NULL,    0, "Inject remaining arguments as already seen messages (e.g. "
       "\"FF08070400/0AB5454850303003277201\")", 0 },
 
@@ -340,6 +343,13 @@ error_t parse_opt(int key, char *arg, struct argp_state *state) {
     }
     if (opt->pollInterval == 0 && opt->scanConfig) {
       argp_error(state, "scanconfig without polling may lead to invalid files included for certain products!");
+      return EINVAL;
+    }
+    break;
+  case O_POLRET:  // --pollretries=0
+    opt->pollRetries = parseInt(arg, 10, 0, 10, &result);
+    if (result != RESULT_OK) {
+      argp_error(state, "invalid pollretries");
       return EINVAL;
     }
     break;
